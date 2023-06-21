@@ -1,124 +1,15 @@
-// const ws = require("nodejs-websocket");
-// console.log("开始建立连接...")
-
-// // 在线人数
-// let onlineUser = [];
-// // 消息队列
-// let msgList = [];
-
-// let cutIndex = null;
-// const socket = ws.createServer(function (conn) {
-//     console.log("conn.readyState", conn.readyState, conn.OPEN);
-//     conn.on("text", function (str) {
-//         console.log("str ========> ", str);
-//         let msg = JSON.parse(str);
-//         if (msg.type == "heartbeat") {
-//             conn.send(JSON.stringify({
-//                 type: "heartbeat",
-//                 msg: onlineUser.length
-//             }));
-//             return;
-//         }
-
-//         let data = {}
-//         if (msg.type == "login") {
-//             let idx = onlineUser.findIndex((item) => {
-//                 return item.userName == msg.userName;
-//             });
-//             if (idx == -1) {
-//                 msg.webSocket = conn;
-//                 onlineUser.push(msg);
-//                 onlineUser.forEach((item) => {
-//                     data = {
-//                         type: 'add',
-//                         userName: msg.userName,
-//                         content: msg.content,
-//                         token: msg.token,
-//                     }
-//                     item.webSocket.send(JSON.stringify(data));
-//                     item.webSocket.send(JSON.stringify({
-//                         type: "heartbeat",
-//                         msg: onlineUser.length
-//                     }));
-//                     console.log("msgList ========> ", msgList);
-//                 });
-//                 msgList.push(data);
-//             };
-//             msgList.forEach((item) => {
-//                 if (item.type == 'self' || item.type == 'others') {
-//                     item.type = msg.userName == item.userName ? 'self' : 'others';
-//                 }
-//             })
-//             let queue = {
-//                 type: "messageList",
-//                 list: msgList
-//             }
-//             conn.send(JSON.stringify(queue));
-//         }
-
-//         if (msg.type == 'cut') {
-//             let idx = onlineUser.findIndex((item) => {
-//                 return item.userName == msg.userName;
-//             });
-//             console.log("idx ===========> ", idx);
-//             if (idx > -1) {
-//                 onlineUser.splice(idx, 1);
-//                 onlineUser.forEach((item) => {
-//                     data = {
-//                         type: 'cut',
-//                         userName: msg.userName,
-//                         content: msg.content,
-//                         token: msg.token,
-//                     }
-//                     item.webSocket.send(JSON.stringify(data));
-//                     item.webSocket.send(JSON.stringify({
-//                         type: "heartbeat",
-//                         msg: onlineUser.length
-//                     }));
-//                     console.log("msgList ========> ", msgList);
-//                 });
-//                 msgList.push(data);
-//             }
-//         }
-
-//         if (msg.type == "msg") {
-//             onlineUser.forEach((item) => {
-//                 console.log("item , msg", item.userName, msg.userName);
-//                 data = {
-//                     type: item.userName == msg.userName ? "self" : 'others',
-//                     userName: msg.userName,
-//                     content: msg.content,
-//                 };
-//                 item.webSocket.send(JSON.stringify(data));
-//             });
-//             msgList.push(data);
-//         }
-//     })
-//     conn.on("close", function (code, reason) {
-//         console.log("关闭连接", code, reason);
-//         // conn.close();
-//     });
-//     conn.on("error", function (code, reason) {
-//         console.log("异常关闭", code, reason)
-//         // conn.error();
-//     });
-// }).listen(8666)
-// console.log("WebSocket建立完毕")
-
-// module.exports = socket;
-
-
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ port: 8666 });
-// 在线人数
-let onlineUser = new Set();
-// 消息队列
-let msgList = [];
+const dayjs = require('dayjs');
+// // 在线人数
+// let onlineUser = new Set();
+// // 消息队列
+// let msgList = [];
+// 房间列表
+let rooms = new Map();
 wss.on('connection', (ws) => {
-    console.log('WebSocket 连接已建立');
-    onlineUser.add(ws);
+    console.log("webSocket 连接成功");
     ws.on('message', (message) => {
-        console.log('收到消息:', message.toString('utf8'));
         // 处理接收到的消息
         let str = message.toString('utf8');
         let msg = JSON.parse(str);
@@ -132,101 +23,146 @@ wss.on('connection', (ws) => {
         }
 
         let data = {}
-        // 登录
-        if (msg.type == "login") {
+
+        // 前端獲取房間列表
+        if (msg.type == 'getRoomList') {
             data = {
-                type: 'add',
-                userName: msg.userName,
-                content: msg.content,
-                token: msg.token,
+                type: 'roomList',
+                list: [],
             }
-            onlineUser.forEach((item) => {
-                if (item != ws && ws.readyState === WebSocket.OPEN) {
-                    item.send(JSON.stringify(data));
-                    item.send(JSON.stringify({
-                        type: "getOnlineUser",
-                        msg: onlineUser.size
-                    }));
+            // if (key.clients.has(ws)) {
+            // 根据房间里是否有该用户判断返不返回房间 ， 后期用数据   用户：[房间1 ， 房间2， 房间5] 这样去做筛选
+            // }
+            rooms.forEach((key, value) => {
+                let parse = {
+                    roomName: key.roomName,
+                    roomId: key.roomId,
+                    date: key.date,
+                    allMessages: key.allMessages
                 }
-            })
-            // let idx = onlineUser.findIndex((item) => {
-            //     return item.userName == msg.userName;
-            // });
-            // if (idx == -1) {
-            //     msg.webSocket = ws;
-            //     onlineUser.push(msg);
-            //     onlineUser.forEach((item) => {
-            //         data = {
-            //             type: 'add',
-            //             userName: msg.userName,
-            //             content: msg.content,
-            //             token: msg.token,
-            //         }
-            //         item.webSocket.send(JSON.stringify(data));
-            //         item.webSocket.send(JSON.stringify({
-            //             type: "getOnlineUser",
-            //             msg: onlineUser.length
-            //         }));
-            //         console.log("msgList ========> ", msgList);
-            //     });
-            //     msgList.push(data);
-            // };
-            msgList.push(data);
-            msgList.forEach((item) => {
-                if (item.type == 'self' || item.type == 'others') {
-                    item.type = msg.userName == item.userName ? 'self' : 'others';
-                }
-            })
-            let queue = {
-                type: "messageList",
-                list: msgList
-            }
-            ws.send(JSON.stringify(queue));
+                data.list.push(parse);
+            });
+            ws.send(JSON.stringify(data));
         }
 
-        // 检查当前在线人数
-        if (msg.type == "getOnlineUser") {
-            ws.send(JSON.stringify({
-                type: "getOnlineUser",
-                msg: onlineUser.size
-            }));
+        // 新增房间
+        if (msg.type == "addRoom") {
+            rooms.set(msg.roomId, {
+                clients: new Set(),
+                allMessages: [],
+                allUser: new Set(),
+                roomName: msg.roomName,
+                roomId: msg.roomId,
+                date: dayjs().format("HH:mm")
+            });
+            // rooms.get(msg.roomId).clients.add(ws);
+            // rooms.get(msg.roomId).allUser.add(msg.userName);
+            data = {
+                type: 'roomList',
+                list: [],
+            }
+            rooms.forEach((key, value) => {
+                let parse = {
+                    roomName: key.roomName,
+                    roomId: key.roomId,
+                    date: key.date,
+                    allMessages: key.allMessages
+                }
+                data.list.push(parse);
+            });
+            ws.send(JSON.stringify(data));
         }
+
         if (msg.type == 'cut') {
-            onlineUser.delete(ws)
-            data = {
-                type: 'cut',
-                userName: msg.userName,
-                content: msg.content,
-                token: msg.token,
-            }
-            onlineUser.forEach((item) => {
-                if (item != ws && ws.readyState === WebSocket.OPEN) {
-                    item.send(JSON.stringify(data));
-                    item.send(JSON.stringify({
-                        type: "getOnlineUser",
-                        msg: onlineUser.size
-                    }));
-                }
-            })
-            msgList.push(data);
-        }
+            console.log("cut ======> " , rooms.get(msg.roomId).clients);
+            rooms.get(msg.roomId).clients.delete(ws);
 
-        if (msg.type == "msg") {
-            onlineUser.forEach((item) => {
+            rooms.get(msg.roomId).clients.forEach((item) => {
                 data = {
-                    type: item == ws ? "self" : 'others',
+                    type: 'messageList',
+                    list: rooms.get(msg.roomId).allMessages,
+                    online: rooms.get(msg.roomId).clients.size
+                }
+                item.send(JSON.stringify(data));
+            })
+            // userClose(msg.roomId, ws)
+        }
+        if (msg.type == "getMessageList") {
+            const roomData = rooms.get(msg.roomId);
+            if (!roomData.clients.has(ws)) {
+                roomData.clients.add(ws);
+            }
+            if (!roomData.allUser.has(msg.userName)) {
+                // 添加到房間的用戶裏
+                roomData.clients.add(ws);
+                roomData.allUser.add(msg.userName);
+                // 往消息列表添加一天歡迎數據
+                roomData.allMessages.push({
                     userName: msg.userName,
-                    content: msg.content,
-                };
-                if (item.readyState === WebSocket.OPEN) {
-                    item.send(JSON.stringify(data));
+                    content: "",
+                    type: "add",
+                });
+            };
+            // 進入房間將未讀清空
+            roomData.allMessages.forEach((item) => {
+                // 判断发送消息是自己发还是其他人发的
+                if (item.type == "self" || item.type == 'others') {
+                    console.log("item.userName == msg.userName", item.userName == msg.userName);
+                    item.type = item.userName == msg.userName ? "self" : 'others';
                 }
             });
-            msgList.push(data);
+            data = {
+                type: 'messageList',
+                list: roomData.allMessages,
+                online: roomData.clients.size
+            }
+            roomData.clients.forEach((item) => {
+                item.send(JSON.stringify(data));
+            })
+            // onlineUser.forEach((item) => {
+            //     data = {
+            //         type: item == ws ? "self" : 'others',
+            //         userName: msg.userName,
+            //         content: msg.content,
+            //     };
+            //     if (item.readyState === WebSocket.OPEN) {
+            //         item.send(JSON.stringify(data));
+            //     }
+            // });
         }
-    });
 
+        if(msg.type == 'sendingMsg'){
+            let roomData = rooms.get(msg.roomId);
+            roomData.allMessages.push({
+                    type :'self',
+                    content: msg.content,
+                    userName: msg.userName,
+            });
+            roomData.allMessages.forEach((item) => {
+                // 判断发送消息是自己发还是其他人发的
+                if (item.type == "self" || item.type == 'others') {
+                    item.type = item.userName == msg.userName ? "self" : 'others';
+                }
+            });
+            roomData.clients.forEach((item) => {
+                data = {
+                    type : item == ws ? "self" : 'others',
+                    content: msg.content,
+                    userName: msg.userName,
+                }
+                item.send(JSON.stringify(data))
+            })
+        }
+
+    });
     ws.on('close', () => {
         console.log('WebSocket 连接已关闭');
     });
 });
+
+// 退出
+// const userClose = (roomId, ws) => {
+//     console.log('WebSocket 连接已关闭');
+    
+//    
+// }
